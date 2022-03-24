@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# File name
+readonly PROGNAME=$(basename $0)
+# File name, without the extension
+readonly PROGBASENAME=${PROGNAME%.*}
+# File directory
+readonly PROGDIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Arguments
+readonly ARGS="$@"
+# Arguments number
+readonly ARGNUM="$#"
+
+delay="0.1"
+
+usage() {
+	echo "Splice together stdin and a program's output."
+	echo
+	echo "Usage: $PROGNAME -i <file> -o <file> [options]..."
+	echo
+	echo "Options:"
+	echo
+	echo "  -h, --help"
+	echo "      This help text."
+	echo
+	echo "  -s <text>, --start-delimiter <text>"
+	echo "      The string to print before an input is given."
+	echo
+	echo "  -e <text>, --end-delimiter <text>"
+	echo "      The string to print after an input is given."
+	echo
+	echo "  -d <number>, --delay <number>"
+	echo "      The delay after which to print the next input."
+	echo
+	echo "  --"
+	echo "      Do not interpret any more arguments as options."
+	echo
+}
+
+while [ "$#" -gt 0 ]
+do
+	case "$1" in
+	-h|--help)
+		usage
+		exit 0
+		;;
+	-s|--start-delimiter)
+		export SPLICE_START_DELIMITER="$2"
+
+		shift
+		;;
+	-e|--end-delimiter)
+		export SPLICE_END_DELIMITER="$2"
+
+		shift
+		;;
+	-d|--delay)
+		delay_input="$2"
+		case $2 in
+		''|*[!0-9]*)
+			echo "Invalid value for '$1'. Ensure you input an integer." >&2
+			exit 1
+		;;
+		*) echo
+		   delay=$(( delay_input / 1000 ))
+		   ;;
+		esac
+
+		;;
+	--)
+		break
+		;;
+	-*)
+		echo "Invalid option '$1'. Use --help to see the valid options" >&2
+		exit 1
+		;;
+	# an option argument, you're done.
+	*)
+		break
+		;;
+	esac
+	shift
+done
+
+(sleep $delay; while read -r line; do echo "$line"; sleep $delay; done) | LD_PRELOAD="$PROGDIR/shim.so" unbuffer -p "$@"
